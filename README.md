@@ -73,16 +73,16 @@ Synopsis
 
 Methods
 ===========
-open_index
-<indexid> <dbname> <tablename> <indexname> <columns> [<fcolumns>]
-find
-<indexid> <op> <vlen> <v1> ... <vn> [LIM] [IN] [FILTER ...]
-find_modify
-<indexid> <op> <vlen> <v1> ... <vn> [LIM] [IN] [FILTER ...] MOD
-insert
-<indexid> + <vlen> <v1> ... <vn>
-auth
-<atyp> <akey>
+	open_index
+	<indexid> <dbname> <tablename> <indexname> <columns> [<fcolumns>]
+	find
+	<indexid> <op> <vlen> <v1> ... <vn> [LIM] [IN] [FILTER ...]
+	find_modify
+	<indexid> <op> <vlen> <v1> ... <vn> [LIM] [IN] [FILTER ...] MOD
+	insert
+	<indexid> + <vlen> <v1> ... <vn>
+	auth
+	<atyp> <akey>
 
 More:
 https://github.com/DeNA/HandlerSocket-Plugin-for-MySQL/blob/master/docs-en/protocol.en.txt
