@@ -1,23 +1,25 @@
 -- Copyright (C) 2013 Zhihua Chen (zhhchen)
-local bit = require("bit")
-local sub = string.sub
-local tcp = ngx.socket.tcp
-local sleep = ngx.sleep
-local insert = table.insert
-local concat = table.concat
+
+local sub     = string.sub
+local find    = string.find
+local gsub    = string.gsub
+local match   = string.match
+local format  = string.format
+local byte    = string.byte
+local char    = string.char
+local tcp     = ngx.socket.tcp
+local insert  = table.insert
+local concat  = table.concat
+local getn    = table.getn
 local foreach = table.foreach
-local floor = math.floor
-local len = string.len
-local null = ngx.null
-local print = ngx.print
-local byte = string.byte
+local print   = ngx.print
 local setmetatable = setmetatable
 local tonumber = tonumber
 local error = error
 
 module(...)
 
-_VERSION = '0.01'
+_VERSION = '0.02'
 
 local commands = {
     open_index='open_index',
@@ -93,31 +95,51 @@ end
 local function hsencode(str)
     local enstr = ''
     if str == 'NULL' then
-        return '\0'
+        return char(0)
     end
-    enstr = string.gsub(str, "([\0-\15])", '\1'..bit.bor("%1",'\64')) 
+    enstr = gsub(str, "([%z"..char(1).."-"..char(15).."])", function(c)
+    	return char(1)..char(byte(c)+64)
+    end)
     return enstr
 end
 
 local function hsdecode(str)
     local destr = ''
-    if str == '\0' then
+    if str == char(0) then
         return 'NULL'
     end
-    destr = string.gsub(str, "\1([\64-\79])", bit.band("%1",'\15')) 
+    destr = gsub(str, char(1).."(["..char(64).."-"..char(79).."])", function(c)
+    	return char(byte(c)-64)
+    end)
     return destr
 end
 
-local function split(str,sep)
-    return {str:match((str:gsub("[^"..sep.."]*"..sep, "([^"..sep.."]*)"..sep)))}
+local function explode(p,d)
+	local t, ll, l
+	t={}
+	ll=0
+	if(#p == 1) then return {p} end
+	while true do
+		l=find(p,d,ll,true) -- find the next d in the string
+		if l~=nil then -- if "not not" found then..
+			insert(t, sub(p,ll,l-1)) -- Save it in our array.
+			ll=l+1 -- save just after where we found it for searching next time.
+		else
+			insert(t, sub(p,ll)) -- Save what's left in our array.
+			break -- Break at end, as it should be, according to the lua manual.
+		end
+	end
+	return t
 end
 
 local function _read_reply(sock,cmd)
-    local line, err = sock:receiveuntil('\n')
-    if not line then
+    local reader = sock:receiveuntil('\n')
+    local data, err, partial = reader()
+    if not data then
         return nil, err
     end
-    local resarr = split(line,'\t')
+
+    local resarr = explode(data,'\t')
     if resarr[1] ~= '0' then
         if resarr[3] == nil then
             resarr[3] = 'read reply err'
@@ -133,12 +155,12 @@ local function _read_reply(sock,cmd)
         local allrow = {}
         local onerow = {}
         local numcols = tonumber(resarr[2])
-        for i=3,table.getn(resarr) do
+        for i=3,getn(resarr) do
             resarr[i] = hsdecode(resarr[i])
-            table.insert(onerow,resarr[i])
+            insert(onerow,resarr[i])
             numcols = numcols - 1
             if numcols == 0 then
-                table.insert(allrow,onerow)
+                insert(allrow,onerow)
                 numcols = tonumber(resarr[2])
                 onerow = {}
             end
@@ -151,29 +173,23 @@ end
 local function _gen_req(cmd, args)
     local req = {}
     if cmd == 'open_index' then
-        table.foreach(args[1], function(ii, vv) args[1][ii] = hsencode(vv) end)
-        table.insert(req,'P\t'..concat(args[1], '\t'))
+        foreach(args, function(i, v) args[i] = hsencode(v) end)
+        insert(req,'P\t'..concat(args, '\t'))
     elseif cmd == 'auth' then
-        table.foreach(args[1], function(ii, vv) args[1][ii] = hsencode(vv) end)
-        table.insert(req,'A\t'..concat(args[1], '\t'))
+        foreach(args, function(i, v) args[i] = hsencode(v) end)
+        insert(req,'A\t'..concat(args, '\t'))
     else
-        table.foreach(args, function(i, v) 
-            table.foreach(v, function(ii, vv) v[ii] = hsencode(vv) end)
-            table.insert(req,concat(v, '\t'))
-        end)
+        foreach(args, function(i, v) args[i] = hsencode(v) end)
+        insert(req,concat(args, '\t'))
     end
 
     return concat(req, '\n')..'\n'
 end
 
 
-local function _do_cmd(self, cmd, ...)
-    local args = {...}
-    if #args ~= 1 then
-        return nil, "args error"
-    end
+local function _do_cmd(self, cmd, args)
 
-    if table.getn(args[1]) < 1 then
+    if getn(args) < 1 then
         return nil, "args error"
     end
 
@@ -182,8 +198,8 @@ local function _do_cmd(self, cmd, ...)
         return nil, "not initialized"
     end
 
-    local req = _gen_req(cmd, args[1])
-
+    local req = _gen_req(cmd, args)
+--    print(req)
     local bytes, err = sock:send(req)
     if not bytes then
         return nil, err
