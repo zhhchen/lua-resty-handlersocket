@@ -90,22 +90,26 @@ function close(self)
 end
 
 
-function hsencode(str)
+local function hsencode(str)
     local enstr = ''
     if str == 'NULL' then
         return '\0'
     end
-    string.gsub(str, "([\0-\15])", function(c) enstr = '\1'..bit.bor(c,'\64') end) 
+    enstr = string.gsub(str, "([\0-\15])", '\1'..bit.bor("%1",'\64')) 
     return enstr
 end
 
-function hsdecode(str)
+local function hsdecode(str)
     local destr = ''
     if str == '\0' then
         return 'NULL'
     end
-    string.gsub(str, "\1([\64-\79])", function(c) destr = bit.band(c,'\15') end) 
+    destr = string.gsub(str, "\1([\64-\79])", bit.band("%1",'\15')) 
     return destr
+end
+
+local function split(str,sep)
+    return {str:match((str:gsub("[^"..sep.."]*"..sep, "([^"..sep.."]*)"..sep)))}
 end
 
 local function _read_reply(sock,cmd)
